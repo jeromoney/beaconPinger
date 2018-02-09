@@ -119,8 +119,12 @@ class Beacon(object):
 
             i += 1
 
-
         self.period = ((ups[-1] - ups[0]) / (len(ups) - 1) + (downs[-1] - downs[0]) / (len(downs) - 1)) * smple_period / 2
+
+        #make sure we don't end up with mismatched ups and downs
+        downs = [i for i in downs if i > ups[0]]
+        ups = [i for i in ups if i < downs[-1]]
+        self.rise = sum([downs[i] - ups[i] for i in range(len(downs))]) / (len(downs) - 1)
 
 
     def findmatch(self, beacons):
@@ -170,5 +174,4 @@ if __name__ == '__main__':
         #beacons.append(newBeacon)
         #pickle.dump(beacons, open("save.p", "wb"))
 
-        print("{0}\t{1}\t{2}".format(newBeacon.id[:6],str(newBeacon.frequency),str(newBeacon.period)))
-
+        print("{0}\t{1}\t{2}".format(newBeacon.id[:6],str(newBeacon.frequency),str(newBeacon.period), str(newBeacon.rise)))
