@@ -103,38 +103,6 @@ class Beacon(object):
         self.frequency = f[peak]
 
 
-    def getpeakFrqFFT(self):
-        #optimization constants
-        DURATION = 10 # seconds. Listen to first 10 seconds.
-
-        #get data
-        fs, data = wavfile.read(self.RECORDING_DIR + '/' + self.id + ".wav")
-
-        data = data.T[0]
-        data = data[:DURATION * fs] #listen to first 10 seconds
-
-        b=[(ele/2**8.)*2-1 for ele in data]
-
-        c = fft(b) # calculate fourier transform (complex numbers list)
-        d = len(c)/2
-
-        k = arange(len(data))
-        T = len(data)/fs  # where fs is the sampling frequency
-        frqLabel = k/T
-        x = frqLabel[:len(frqLabel)/2 - 1]
-        y = abs(c[:(d-1)])
-
-        # Find peak frequency near 2000hz
-        lower_bnd = np.argwhere(x == self.FRQ_NEIGHBORHOOD * 9 / 10)[0][0]
-        upper_bnd = np.argwhere(x == self.FRQ_NEIGHBORHOOD * 11 / 10)[0][-1]
-
-        # search between boundaries for peak
-        peak = np.argmax(y[lower_bnd:upper_bnd])
-        self.frequency = int(x[lower_bnd + peak])
-
-
-
-
     def getperiod(self):
 
         #optimization constants
