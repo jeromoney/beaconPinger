@@ -69,7 +69,7 @@ class Beacon(object):
 
     def getpeakFrq(self,t0,t1):
         #optimization constants
-        DURATION = 15 # seconds. Listen to first 10 seconds.
+        DURATION = 30 # seconds. Listen to first 10 seconds.
 
         #get data
         fs, data = wavfile.read(self.RECORDING_DIR + '/' + self.id + ".wav")
@@ -78,6 +78,7 @@ class Beacon(object):
         data = data[t0*fs:t1 * fs] #listen to first 10 seconds
 
         f, Period_spec = signal.periodogram(data, fs, 'flattop', scaling='spectrum')
+
 
         # search between boundaries for peak
         peak = np.argmax(Period_spec)
@@ -98,13 +99,6 @@ class Beacon(object):
         data = [sum(data[i: i + smple_period]) / SMOOTH_FQ for i in range(0, len(data), smple_period)]
 
         i = 0
-        smple = 100
-        avgSnd = sum(data[:smple])
-        #Ensure that we start counting before beep, during quiet time
-        while avgSnd > smple * max(data) / 3 and i + smple < len(data):
-            avgSnd += data[i + smple] - data[i]
-            i += 1
-
         ups = []
         downs = []
         half_lmt = max(data) / 2
@@ -126,7 +120,6 @@ class Beacon(object):
         ups = [i for i in ups if i < downs[-1]]
         self.rise = sum([downs[i] - ups[i] for i in range(len(downs))]) / (len(downs) - 1)
 
-
     def findmatch(self, beacons):
 
         minDist = 20
@@ -147,7 +140,7 @@ if __name__ == '__main__':
         newBeacon = Beacon()
         #newBeacon.recordsignal()
         newBeacon.id = recording[:-4]
-
+        print newBeacon.id
         newBeacon.getpeakFrq(i,i+5)
         newBeacon.getperiod()
 
