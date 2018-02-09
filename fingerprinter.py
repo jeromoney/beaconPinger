@@ -25,7 +25,8 @@ class Beacon(object):
         self.id = str(int(time()*1000))
         self.name = None
         self.frequency = None
-        self.period = None # periods per 1000 secs
+        self.period = None # secs
+        self.rise = None # time signal is sent ~0.2s
         self.RECORDING_DIR = 'soundRecordings'
         self.FRQ_NEIGHBORHOOD = 2000 # hz (peak signal should be nearby)
 
@@ -82,64 +83,45 @@ class Beacon(object):
         peak = np.argmax(Period_spec)
         self.frequency = f[peak]
 
-
     def getperiod(self):
-
         #optimization constants
-        DOWNSAMPLE = 5
-        LISTEN = 15 #seconds
+        LISTEN = 30 #seconds
+        SMOOTH_FQ = 4000 #hz smoothes signal to frequency
 
         fs, data = wavfile.read(self.RECORDING_DIR + '/' + self.id + ".wav")
         data = data.T[0]
-        data = data[:fs*LISTEN]
-
         data = abs(data)
 
+        # average data over a half of period (4000 hz)
+        smple_period = int(fs / SMOOTH_FQ)
 
-        #downsample data
-        data = data[::DOWNSAMPLE]
-        if True:
-            res = []
+        data = [sum(data[i: i + smple_period]) / SMOOTH_FQ for i in range(0, len(data), smple_period)]
 
-            maxCorrel = -1
-            maxIndex = -1
-            for i in range(fs/DOWNSAMPLE * 6 / 10 , fs/DOWNSAMPLE * 13 / 10):
-                corr = np.corrcoef(data, np.roll(data, i))[1, 0]
-                if maxCorrel < corr:
-                    maxCorrel = corr
-                    maxIndex = i
-                res.append(corr)
+        i = 0
+        smple = 100
+        avgSnd = sum(data[:smple])
+        #Ensure that we start counting before beep, during quiet time
+        while avgSnd > smple * max(data) / 3 and i + smple < len(data):
+            avgSnd += data[i + smple] - data[i]
+            i += 1
 
-            #plt.plot(res, 'r')
-            #plt.show()
-            self.period = int((float(maxIndex * DOWNSAMPLE) / fs) * 1000)
+        ups = []
+        downs = []
+        half_lmt = max(data) / 2
+
+        while i + 1 < len(data):
+            if data[i] < half_lmt <= data[i+1]:
+                ups.append(float(i) / fs)
+                i += 30
+            elif data[i] > half_lmt >= data[i+1]:
+                downs.append(float(i) / fs)
+                i += 30
+
+            i += 1
 
 
-        else:
-            maxSound = max(data)
+        self.period = ((ups[-1] - ups[0]) / (len(ups) - 1) + (downs[-1] - downs[0]) / (len(downs) - 1)) * smple_period / 2
 
-            i = 0
-            results = []
-
-            # naive algo to find period of signal
-            # listens for threshold to be exceeded
-            # makes a note of time and then jumps ahead past signal
-            while i < len(data):
-                if data[i] > maxSound * 25 / 100:
-                    results.append(i)
-                    i += fs * 6 / 10
-                else:
-                    i += 1
-
-            old = float(results[0]) / fs
-            periods = []
-            for i in results[1:]:
-                new = float(i) / fs
-                time = new - old
-                old = new
-                periods.append(int(time * 1000))
-
-            self.period = int(sum(periods) / len(periods))
 
     def findmatch(self, beacons):
 
@@ -156,19 +138,14 @@ class Beacon(object):
 if __name__ == '__main__':
     recordings = os.listdir('/home/justin/PycharmProjects/beaconPinger/recordedBacons/')
 
-    ids = {}
+    for recording in recordings:
+        i = 0
+        newBeacon = Beacon()
+        #newBeacon.recordsignal()
+        newBeacon.id = recording[:-4]
 
-    for i in range(0,30,5):
-        for recording in recordings:
-            newBeacon = Beacon()
-            #newBeacon.recordsignal()
-            newBeacon.id = recording[:-4]
-            if newBeacon.id not in ids.keys():
-                ids[newBeacon.id] = []
-
-            newBeacon.getpeakFrq(i,i+5)
-            ids[newBeacon.id].append(newBeacon.frequency)
-
+        newBeacon.getpeakFrq(i,i+5)
+        newBeacon.getperiod()
 
         #newBeacon.getperiod()
         #
@@ -193,9 +170,5 @@ if __name__ == '__main__':
         #beacons.append(newBeacon)
         #pickle.dump(beacons, open("save.p", "wb"))
 
+        print("{0}\t{1}\t{2}".format(newBeacon.id[:6],str(newBeacon.frequency),str(newBeacon.period)))
 
-        #print("{0},{1}".format(newBeacon.id[:6],str(newBeacon.frequency)))
-        #print("{0};{1}".format(newBeacon.id,str(newBeacon.period)))
-
-    for id in ids.keys():
-        print ids[id]
